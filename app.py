@@ -13,7 +13,7 @@ start_date = end_date - datetime.timedelta(days=30)
 data = yf.download(symbol, start=start_date, end=end_date)
 
 # Convert data to JSON format
-price_data = data[['Open', 'Close']].to_dict(orient='index')
+price_data = data[['Open', 'Close']].rename(columns={'Open': 'open', 'Close': 'close'}).to_dict(orient='index')
 
 # JavaScript function for IndexedDB storage
 indexeddb_script = f"""
@@ -50,7 +50,7 @@ function getData() {{
         dataRequest.onsuccess = function() {{
             let rawData = dataRequest.result;
             let result = rawData ? JSON.parse(rawData) : null;
-            document.getElementById('retrievedValue').innerText = result ? `Open: ${result.Open}, Close: ${result.Close}` : "No data found";
+            document.getElementById('retrievedValue').innerText = result ? `Open: ${result.open}, Close: ${result.close}` : "No data found";
         }};
     }};
 }}
