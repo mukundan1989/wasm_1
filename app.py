@@ -2,40 +2,76 @@ import streamlit as st
 import yfinance as yf
 from datetime import datetime, timedelta
 
-# Set page title
-st.set_page_config(page_title="AAPL Stock Prices")
-
-# Title for the app
-st.title("AAPL Open/Close Prices")
+st.title("Stock Open/Close Prices & Data Store Test")
 
 # Function to fetch stock data
-def fetch_stock_data(days=30):
-    # Calculate date range
+def fetch_stock_data(ticker, days=30):
     end_date = datetime.today()
     start_date = end_date - timedelta(days=days)
-    
-    # Fetch data from Yahoo Finance
-    ticker = "AAPL"
     data = yf.download(ticker, start=start_date, end=end_date)
-    
-    # Reset index to make Date a column
     data = data.reset_index()
-    
-    # Convert Date to string for display
     data['Date'] = data['Date'].dt.strftime('%Y-%m-%d')
-    
-    return data[['Date', 'Open', 'Close']]  # Return only needed columns
+    return data[['Date', 'Open', 'Close']]
 
-# Sidebar for user input
-st.sidebar.header("Settings")
-days_to_fetch = st.sidebar.slider("Number of days to fetch:", 1, 365, 30)
+# Input for stock name
+ticker = st.text_input("Enter Stock Symbol (e.g., AAPL):")
+days_to_fetch = st.slider("Number of days to fetch:", 1, 365, 30)
 
-# Fetch and display data
-st.subheader(f"AAPL Open/Close Prices (Last {days_to_fetch} days)")
-data = fetch_stock_data(days_to_fetch)
+if st.button("Fetch Stock Data"):
+    if ticker:
+        stock_data = fetch_stock_data(ticker, days_to_fetch)
+        st.dataframe(stock_data, hide_index=True)
+    else:
+        st.warning("Please enter a stock symbol.")
 
-# Display the data table
-st.dataframe(data, hide_index=True)
+# IndexedDB JavaScript script
+indexeddb_script = """
+<script>
+function storeData() {
+    let key = document.getElementById('storeKey').value;
+    let value = document.getElementById('storeValue').value;
+    let request = indexedDB.open("WASM_DB", 1);
+    request.onupgradeneeded = function(event) {
+        let db = event.target.result;
+        if (!db.objectStoreNames.contains("store")) {
+            db.createObjectStore("store");
+        }
+    };
+    request.onsuccess = function(event) {
+        let db = event.target.result;
+        let transaction = db.transaction("store", "readwrite");
+        let store = transaction.objectStore("store");
+        store.put(value, key);
+        alert("Data stored successfully!");
+    };
+}
 
-# Add some info
-st.info("Data fetched from Yahoo Finance using yfinance library.")
+function getData() {
+    let key = document.getElementById('retrieveKey').value;
+    let request = indexedDB.open("WASM_DB", 1);
+    request.onsuccess = function(event) {
+        let db = event.target.result;
+        let transaction = db.transaction("store", "readonly");
+        let store = transaction.objectStore("store");
+        let dataRequest = store.get(key);
+        dataRequest.onsuccess = function() {
+            document.getElementById('retrievedValue').innerText = dataRequest.result || "No data found";
+        };
+    };
+}
+</script>
+"""
+
+# Store and Retrieve UI
+st.components.v1.html(f"""
+{indexeddb_script}
+<input type='text' id='storeKey' placeholder='Enter Stock Name, Date'>
+<input type='text' id='storeValue' placeholder='Enter Open, Close Price'>
+<button onclick='storeData()'>Store Data</button>
+<br><br>
+<input type='text' id='retrieveKey' placeholder='Enter Stock Name, Date to Retrieve'>
+<button onclick='getData()'>Retrieve Data</button>
+<p id='retrievedValue'></p>
+""", height=300)
+
+st.info("Stock price data is fetched from Yahoo Finance using yfinance library.")
