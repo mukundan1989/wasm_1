@@ -21,31 +21,35 @@ if st.button("Fetch Stock Data"):
     if ticker:
         stock_data = fetch_stock_data(ticker, days_to_fetch)
         st.dataframe(stock_data, hide_index=True)
+        
+        # Convert data to JSON format for storage
+        stock_json = stock_data.to_json(orient='records')
+        
+        # Store fetched data in IndexedDB
+        st.components.v1.html(f"""
+        <script>
+        let request = indexedDB.open("WASM_DB", 1);
+        request.onupgradeneeded = function(event) {{
+            let db = event.target.result;
+            if (!db.objectStoreNames.contains("store")) {{
+                db.createObjectStore("store");
+            }}
+        }};
+        request.onsuccess = function(event) {{
+            let db = event.target.result;
+            let transaction = db.transaction("store", "readwrite");
+            let store = transaction.objectStore("store");
+            store.put({stock_json}, "{ticker}");
+            alert("Stock data stored successfully!");
+        }};
+        </script>
+        """, height=0)
     else:
         st.warning("Please enter a stock symbol.")
 
-# IndexedDB JavaScript script
+# IndexedDB JavaScript script for retrieval
 indexeddb_script = """
 <script>
-function storeData() {
-    let key = document.getElementById('storeKey').value;
-    let value = document.getElementById('storeValue').value;
-    let request = indexedDB.open("WASM_DB", 1);
-    request.onupgradeneeded = function(event) {
-        let db = event.target.result;
-        if (!db.objectStoreNames.contains("store")) {
-            db.createObjectStore("store");
-        }
-    };
-    request.onsuccess = function(event) {
-        let db = event.target.result;
-        let transaction = db.transaction("store", "readwrite");
-        let store = transaction.objectStore("store");
-        store.put(value, key);
-        alert("Data stored successfully!");
-    };
-}
-
 function getData() {
     let key = document.getElementById('retrieveKey').value;
     let request = indexedDB.open("WASM_DB", 1);
@@ -55,21 +59,17 @@ function getData() {
         let store = transaction.objectStore("store");
         let dataRequest = store.get(key);
         dataRequest.onsuccess = function() {
-            document.getElementById('retrievedValue').innerText = dataRequest.result || "No data found";
+            document.getElementById('retrievedValue').innerText = JSON.stringify(dataRequest.result) || "No data found";
         };
     };
 }
 </script>
 """
 
-# Store and Retrieve UI
+# Retrieve UI
 st.components.v1.html(f"""
 {indexeddb_script}
-<input type='text' id='storeKey' placeholder='Enter Stock Name, Date'>
-<input type='text' id='storeValue' placeholder='Enter Open, Close Price'>
-<button onclick='storeData()'>Store Data</button>
-<br><br>
-<input type='text' id='retrieveKey' placeholder='Enter Stock Name, Date to Retrieve'>
+<input type='text' id='retrieveKey' placeholder='Enter Stock Symbol to Retrieve'>
 <button onclick='getData()'>Retrieve Data</button>
 <p id='retrievedValue'></p>
 """, height=300)
