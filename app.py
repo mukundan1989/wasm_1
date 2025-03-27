@@ -1,66 +1,66 @@
 import streamlit as st
+import yfinance as yf
+import datetime
 
 st.title("WASM Data Store Test")
 
-st.write("This app uses WebAssembly (via JavaScript) to store and retrieve stock data in IndexedDB.")
+st.write("This app fetches last 1 month price data for AAPL from Yahoo Finance, stores it in IndexedDB, and allows retrieval.")
+
+# Fetch last 1 month data for AAPL
+symbol = "AAPL"
+end_date = datetime.datetime.today().date()
+start_date = end_date - datetime.timedelta(days=30)
+data = yf.download(symbol, start=start_date, end=end_date)
+
+# Convert data to JSON format
+price_data = data[['Open', 'Close']].to_dict(orient='index')
 
 # JavaScript function for IndexedDB storage
-indexeddb_script = """
+indexeddb_script = f"""
 <script>
-function storeData() {
-    let stock = document.getElementById('stockName').value;
-    let date = document.getElementById('stockDate').value;
-    let openPrice = document.getElementById('openPrice').value;
-    let closePrice = document.getElementById('closePrice').value;
-    let key = stock + '_' + date;
-    let value = JSON.stringify({open: openPrice, close: closePrice});
-    
+function storeData() {{
+    let priceData = {price_data};
     let request = indexedDB.open("WASM_DB", 1);
-    request.onupgradeneeded = function(event) {
+    request.onupgradeneeded = function(event) {{
         let db = event.target.result;
-        if (!db.objectStoreNames.contains("store")) {
+        if (!db.objectStoreNames.contains("store")) {{
             db.createObjectStore("store");
-        }
-    };
-    request.onsuccess = function(event) {
+        }}
+    }};
+    request.onsuccess = function(event) {{
         let db = event.target.result;
         let transaction = db.transaction("store", "readwrite");
         let store = transaction.objectStore("store");
-        store.put(value, key);
+        for (let date in priceData) {{
+            let value = JSON.stringify(priceData[date]);
+            store.put(value, date);
+        }}
         alert("Stock data stored successfully!");
-    };
-}
+    }};
+}}
 
-function getData() {
-    let stock = document.getElementById('retrieveStock').value;
+function getData() {{
     let date = document.getElementById('retrieveDate').value;
-    let key = stock + '_' + date;
-    
     let request = indexedDB.open("WASM_DB", 1);
-    request.onsuccess = function(event) {
+    request.onsuccess = function(event) {{
         let db = event.target.result;
         let transaction = db.transaction("store", "readonly");
         let store = transaction.objectStore("store");
-        let dataRequest = store.get(key);
-        dataRequest.onsuccess = function() {
+        let dataRequest = store.get(date);
+        dataRequest.onsuccess = function() {{
             let result = dataRequest.result ? JSON.parse(dataRequest.result) : "No data found";
-            document.getElementById('retrievedValue').innerText = result.open ? `Open: ${result.open}, Close: ${result.close}` : result;
-        };
-    };
-}
+            document.getElementById('retrievedValue').innerText = result.Open ? `Open: ${result.Open}, Close: ${result.Close}` : result;
+        }};
+    }};
+}}
 </script>
 """
 
 # Display JavaScript in Streamlit
 st.components.v1.html(f"""
 {indexeddb_script}
-<input type='text' id='stockName' placeholder='Stock Name'>
-<input type='date' id='stockDate'>
-<input type='text' id='openPrice' placeholder='Open Price'>
-<input type='text' id='closePrice' placeholder='Close Price'>
-<button onclick='storeData()'>Store Data</button>
+<button onclick='storeData()'>Store Last 1 Month Data</button>
 <br><br>
-<input type='text' id='retrieveStock' placeholder='Stock Name'>
 <input type='date' id='retrieveDate'>
 <button onclick='getData()'>Retrieve Data</button>
 <p id='retrievedValue'></p>
