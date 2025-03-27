@@ -37,16 +37,29 @@ data = fetch_stock_data(days_to_fetch)
 # Display the data table
 st.dataframe(data[['Date', 'Open', 'Close']], hide_index=True)
 
-# Display a line chart
+# Display a line chart - FIXED VERSION
 st.subheader("Price Trend")
-st.line_chart(data.set_index('Date')[['Open', 'Close']])
+if not data.empty:
+    try:
+        # Ensure we're working with numeric values
+        chart_data = data[['Date', 'Open', 'Close']].copy()
+        chart_data['Open'] = pd.to_numeric(chart_data['Open'])
+        chart_data['Close'] = pd.to_numeric(chart_data['Close'])
+        
+        # Set Date as index and plot
+        st.line_chart(chart_data.set_index('Date'))
+    except Exception as e:
+        st.error(f"Error creating chart: {str(e)}")
+else:
+    st.warning("No data available to display chart.")
 
 # Display latest price
-latest = data.iloc[-1]
-st.subheader("Latest Price")
-col1, col2 = st.columns(2)
-col1.metric("Open Price", f"${latest['Open']:.2f}")
-col2.metric("Close Price", f"${latest['Close']:.2f}")
+if not data.empty:
+    latest = data.iloc[-1]
+    st.subheader("Latest Price")
+    col1, col2 = st.columns(2)
+    col1.metric("Open Price", f"${latest['Open']:.2f}")
+    col2.metric("Close Price", f"${latest['Close']:.2f}")
 
 # Add some info
 st.info("Data fetched from Yahoo Finance using yfinance library.")
