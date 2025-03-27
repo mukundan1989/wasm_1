@@ -2,18 +2,19 @@ import streamlit as st
 
 st.title("WASM Data Store Test")
 
-st.write("This app uses WebAssembly (via JavaScript) to store and retrieve data in IndexedDB.")
-
-# Input fields for data storage
-key = st.text_input("Enter Key:")
-value = st.text_input("Enter Value:")
+st.write("This app uses WebAssembly (via JavaScript) to store and retrieve stock data in IndexedDB.")
 
 # JavaScript function for IndexedDB storage
 indexeddb_script = """
 <script>
 function storeData() {
-    let key = document.getElementById('storeKey').value;
-    let value = document.getElementById('storeValue').value;
+    let stock = document.getElementById('stockName').value;
+    let date = document.getElementById('stockDate').value;
+    let openPrice = document.getElementById('openPrice').value;
+    let closePrice = document.getElementById('closePrice').value;
+    let key = stock + '_' + date;
+    let value = JSON.stringify({open: openPrice, close: closePrice});
+    
     let request = indexedDB.open("WASM_DB", 1);
     request.onupgradeneeded = function(event) {
         let db = event.target.result;
@@ -26,12 +27,15 @@ function storeData() {
         let transaction = db.transaction("store", "readwrite");
         let store = transaction.objectStore("store");
         store.put(value, key);
-        alert("Data stored successfully!");
+        alert("Stock data stored successfully!");
     };
 }
 
 function getData() {
-    let key = document.getElementById('retrieveKey').value;
+    let stock = document.getElementById('retrieveStock').value;
+    let date = document.getElementById('retrieveDate').value;
+    let key = stock + '_' + date;
+    
     let request = indexedDB.open("WASM_DB", 1);
     request.onsuccess = function(event) {
         let db = event.target.result;
@@ -39,7 +43,8 @@ function getData() {
         let store = transaction.objectStore("store");
         let dataRequest = store.get(key);
         dataRequest.onsuccess = function() {
-            document.getElementById('retrievedValue').innerText = dataRequest.result || "No data found";
+            let result = dataRequest.result ? JSON.parse(dataRequest.result) : "No data found";
+            document.getElementById('retrievedValue').innerText = result.open ? `Open: ${result.open}, Close: ${result.close}` : result;
         };
     };
 }
@@ -49,11 +54,14 @@ function getData() {
 # Display JavaScript in Streamlit
 st.components.v1.html(f"""
 {indexeddb_script}
-<input type='text' id='storeKey' placeholder='Enter Key'>
-<input type='text' id='storeValue' placeholder='Enter Value'>
+<input type='text' id='stockName' placeholder='Stock Name'>
+<input type='date' id='stockDate'>
+<input type='text' id='openPrice' placeholder='Open Price'>
+<input type='text' id='closePrice' placeholder='Close Price'>
 <button onclick='storeData()'>Store Data</button>
 <br><br>
-<input type='text' id='retrieveKey' placeholder='Enter Key to Retrieve'>
+<input type='text' id='retrieveStock' placeholder='Stock Name'>
+<input type='date' id='retrieveDate'>
 <button onclick='getData()'>Retrieve Data</button>
 <p id='retrievedValue'></p>
-""", height=300)
+""", height=350)
