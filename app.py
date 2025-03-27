@@ -1,68 +1,52 @@
 import streamlit as st
 import yfinance as yf
-import datetime
+from datetime import datetime, timedelta
 
-st.title("WASM Data Store Test")
+# Set page title and icon
+st.set_page_config(page_title="AAPL Stock Price", page_icon="📈")
 
-st.write("This app fetches last 1 month price data for AAPL from Yahoo Finance, stores it in IndexedDB, and allows retrieval.")
+# Title for the app
+st.title("AAPL Stock Price Fetcher")
 
-# Fetch last 1 month data for AAPL
-symbol = "AAPL"
-end_date = datetime.datetime.today().date()
-start_date = end_date - datetime.timedelta(days=30)
-data = yf.download(symbol, start=start_date, end=end_date)
+# Function to fetch stock data
+def fetch_stock_data(days=30):
+    # Calculate date range
+    end_date = datetime.today()
+    start_date = end_date - timedelta(days=days)
+    
+    # Fetch data from Yahoo Finance
+    ticker = "AAPL"
+    data = yf.download(ticker, start=start_date, end=end_date)
+    
+    # Reset index to make Date a column
+    data = data.reset_index()
+    
+    # Convert Date to string for display
+    data['Date'] = data['Date'].dt.strftime('%Y-%m-%d')
+    
+    return data
 
-# Convert data to JSON format
-price_data = data[['Open', 'Close']].rename(columns={'Open': 'open', 'Close': 'close'}).to_dict(orient='index')
+# Sidebar for user input
+st.sidebar.header("Settings")
+days_to_fetch = st.sidebar.slider("Number of days to fetch:", 1, 365, 30)
 
-# JavaScript function for IndexedDB storage
-indexeddb_script = f"""
-<script>
-function storeData() {{
-    let priceData = {price_data};
-    let request = indexedDB.open("WASM_DB", 1);
-    request.onupgradeneeded = function(event) {{
-        let db = event.target.result;
-        if (!db.objectStoreNames.contains("store")) {{
-            db.createObjectStore("store");
-        }}
-    }};
-    request.onsuccess = function(event) {{
-        let db = event.target.result;
-        let transaction = db.transaction("store", "readwrite");
-        let store = transaction.objectStore("store");
-        for (let date in priceData) {{
-            let value = JSON.stringify(priceData[date]);
-            store.put(value, date);
-        }}
-        alert("Stock data stored successfully!");
-    }};
-}}
+# Fetch and display data
+st.subheader(f"AAPL Open/Close Prices (Last {days_to_fetch} days)")
+data = fetch_stock_data(days_to_fetch)
 
-function getData() {{
-    let date = document.getElementById('retrieveDate').value;
-    let request = indexedDB.open("WASM_DB", 1);
-    request.onsuccess = function(event) {{
-        let db = event.target.result;
-        let transaction = db.transaction("store", "readonly");
-        let store = transaction.objectStore("store");
-        let dataRequest = store.get(date);
-        dataRequest.onsuccess = function() {{
-            let rawData = dataRequest.result;
-            let result = rawData ? JSON.parse(rawData) : null;
-            document.getElementById('retrievedValue').innerText = result ? `Open: ${result.open}, Close: ${result.close}` : "No data found";
-        }};
-    }};
-}}
-</script>
-"""
+# Display the data table
+st.dataframe(data[['Date', 'Open', 'Close']], hide_index=True)
 
-# Display JavaScript in Streamlit
-st.components.v1.html(f"""
-{indexeddb_script}
-<button onclick='storeData()'>Store Last 1 Month Data</button>
-<br><br>
-<input type='date' id='retrieveDate'>
-<button onclick='getData()'>Retrieve Data</button>
-<p id='retrievedValue'></p>
-""", height=350)
+# Display a line chart
+st.subheader("Price Trend")
+st.line_chart(data.set_index('Date')[['Open', 'Close']])
+
+# Display latest price
+latest = data.iloc[-1]
+st.subheader("Latest Price")
+col1, col2 = st.columns(2)
+col1.metric("Open Price", f"${latest['Open']:.2f}")
+col2.metric("Close Price", f"${latest['Close']:.2f}")
+
+# Add some info
+st.info("Data fetched from Yahoo Finance using yfinance library.")
