@@ -48,8 +48,9 @@ function getData() {{
         let store = transaction.objectStore("store");
         let dataRequest = store.get(date);
         dataRequest.onsuccess = function() {{
-            let result = dataRequest.result ? JSON.parse(dataRequest.result) : "No data found";
-            document.getElementById('retrievedValue').innerText = result.Open ? `Open: ${result.Open}, Close: ${result.Close}` : result;
+            let rawData = dataRequest.result;
+            let result = rawData ? JSON.parse(rawData) : null;
+            document.getElementById('retrievedValue').innerText = result ? `Open: ${result.Open}, Close: ${result.Close}` : "No data found";
         }};
     }};
 }}
